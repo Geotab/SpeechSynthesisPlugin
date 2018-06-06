@@ -55,4 +55,9 @@ SpeechSynthesis.prototype.getVoices = function() {
 	return this._voices;
 };
 
+SpeechSynthesis.prototype.silence = function (milliseconds) {
+	exec(null, null, "SpeechSynthesis", "silence", [milliseconds]);
+};
+
+
 module.exports = new SpeechSynthesis();
