@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +28,7 @@ import org.apache.cordova.PluginResult;
 public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, OnUtteranceCompletedListener {
 
     private static final String LOG_TAG = "TTS";
+    private static final String ANDROID_TTS_PKG_STRING = "com.google.android.tts";
     private static final int STOPPED = 0;
     private static final int INITIALIZING = 1;
     private static final int STARTED = 2;
@@ -34,10 +36,9 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
     private int state = STOPPED;
     private CallbackContext startupCallbackContext;
     private CallbackContext callbackContext;
+    private boolean isGoogleTtsAvailable = true;
 
     private Set<Voice> voiceList = null;
-
-    //private String startupCallbackId = "";
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
@@ -74,10 +75,10 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
 
                 float volume = (float)utterance.optDouble("volume", 0.5);
                 // how to set volume
-                
+
                 float rate = (float)utterance.optDouble("rate", 1.0);
                 mTts.setSpeechRate(rate);
-                
+
                 if (isReady()) {
                     HashMap<String, String> map = null;
                     map = new HashMap<String, String>();
@@ -98,7 +99,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                 if (isReady()) {
                     HashMap<String, String> map = null;
                     map = new HashMap<String, String>();
-                    //map.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, callbackId);
+
                     mTts.speak("", TextToSpeech.QUEUE_FLUSH, map);
                     fireEndEvent(callbackContext);
                 } else {
@@ -131,24 +132,24 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                 this.startupCallbackContext = callbackContext;
                 if (mTts == null) {
                     state = SpeechSynthesis.INITIALIZING;
-                    mTts = new TextToSpeech(cordova.getActivity().getApplicationContext(), this);
-                }else{
+                    mTts = new TextToSpeech(cordova.getActivity().getApplicationContext(), this,
+                            SpeechSynthesis.ANDROID_TTS_PKG_STRING);
+                    Log.i(LOG_TAG, "hohoho: " + mTts.getEngines());
+                    if (!Arrays.asList(mTts.getEngines()).contains(SpeechSynthesis.ANDROID_TTS_PKG_STRING)) {
+                        isGoogleTtsAvailable = false;
+                    }
+                } else if (isGoogleTtsAvailable) {
             		getVoices(callbackContext);
                 }
                 PluginResult pluginResult = new PluginResult(status, SpeechSynthesis.INITIALIZING);
                 pluginResult.setKeepCallback(true);
                 startupCallbackContext.sendPluginResult(pluginResult);
-            }
-
-			
-			
-            else if (action.equals("shutdown")) {
+            } else if (action.equals("shutdown")) {
                 if (mTts != null) {
                     mTts.shutdown();
                 }
                 callbackContext.sendPluginResult(new PluginResult(status, result));
-            }
-            else if (action.equals("isLanguageAvailable")) {
+            } else if (action.equals("isLanguageAvailable")) {
                 if (mTts != null) {
                     Locale loc = new Locale(args.getString(0));
                     int available = mTts.isLanguageAvailable(loc);
@@ -166,37 +167,34 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
     private void getVoices(CallbackContext callbackContext) {
         JSONArray voices = new JSONArray();
         JSONObject voice;
-        //List<TextToSpeech.EngineInfo> engines = mTts.getEngines();
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            this.voiceList = mTts.getVoices();
-            for (Voice v : this.voiceList) {
-                Locale locale = v.getLocale();
-                voice = new JSONObject();
-                try {
-                    voice.put("voiceURI", v.getName());
-                    voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
-                    //voice.put("features", v.getFeatures());
-                    //voice.put("displayName", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
-                    voice.put("lang", locale.getLanguage()+"-"+locale.getCountry());
-                    voice.put("localService", !v.isNetworkConnectionRequired());
-                    voice.put("quality", v.getQuality());
-                    voice.put("default", false);
-                } catch (JSONException e) {
-                    // should never happen
+            if (isGoogleTtsAvailable) {
+                this.voiceList = mTts.getVoices();
+                for (Voice v : this.voiceList) {
+                    Locale locale = v.getLocale();
+                    voice = new JSONObject();
+                    try {
+                        voice.put("voiceURI", v.getName());
+                        voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
+                        voice.put("lang", locale.getLanguage()+"-"+locale.getCountry());
+                        voice.put("localService", !v.isNetworkConnectionRequired());
+                        voice.put("quality", v.getQuality());
+                        voice.put("default", false);
+                    } catch (JSONException e) {
+                        // should never happen
+                    }
+                    voices.put(voice);
                 }
-                voices.put(voice);
             }
-        }else{
-            //Iterator<Locale> list = voiceList.iterator();
+        } else {
             Locale[] list = Locale.getAvailableLocales();
             Locale locale;
-            //while (list.hasNext()) {
-            //    locale = list.next();
+
             for (int i = 0; i < list.length; i++) {
                 locale = list[i];
                 voice = new JSONObject();
-                if (mTts.isLanguageAvailable(locale) > 0) {     // ie LANG_COUNTRY_AVAILABLE or LANG_COUNTRY_VAR_AVAILABLE
+                if (isGoogleTtsAvailable && mTts.isLanguageAvailable(locale) > 0) {
                     try {
                         voice.put("voiceURI", locale.getLanguage()+"-"+locale.getCountry());
                         voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
@@ -210,6 +208,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                 }
             }
         }
+
         PluginResult result = new PluginResult(PluginResult.Status.OK, voices);
         result.setKeepCallback(false);
         startupCallbackContext.sendPluginResult(result);
@@ -256,36 +255,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
         if (mTts != null && status == TextToSpeech.SUCCESS) {
             state = SpeechSynthesis.STARTED;
             getVoices(this.startupCallbackContext);
-            
-            
-//                Putting this code in hear as a place holder. When everything moves to API level 15 or greater
-//                we'll switch over to this way of tracking progress.
-//                mTts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-//
-//                    @Override
-//                    public void onDone(String utteranceId) {
-//                        Log.d(LOG_TAG, "got completed utterance");
-//                        PluginResult result = new PluginResult(PluginResult.Status.OK);
-//                        result.setKeepCallback(false);
-//                        callbackContext.sendPluginResult(result);        
-//                    }
-//
-//                    @Override
-//                    public void onError(String utteranceId) {
-//                        Log.d(LOG_TAG, "got utterance error");
-//                        PluginResult result = new PluginResult(PluginResult.Status.ERROR);
-//                        result.setKeepCallback(false);
-//                        callbackContext.sendPluginResult(result);        
-//                    }
-//
-//                    @Override
-//                    public void onStart(String utteranceId) {
-//                        Log.d(LOG_TAG, "started talking");
-//                    }
-//                    
-//                });
-        }
-        else if (status == TextToSpeech.ERROR) {
+        } else if (status == TextToSpeech.ERROR) {
             state = SpeechSynthesis.STOPPED;
             PluginResult result = new PluginResult(PluginResult.Status.ERROR, SpeechSynthesis.STOPPED);
             result.setKeepCallback(false);
