@@ -134,7 +134,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                     state = SpeechSynthesis.INITIALIZING;
                     mTts = new TextToSpeech(cordova.getActivity().getApplicationContext(), this,
                             SpeechSynthesis.ANDROID_TTS_PKG_STRING);
-                    Log.i(LOG_TAG, "hohoho: " + mTts.getEngines());
+
                     if (!Arrays.asList(mTts.getEngines()).contains(SpeechSynthesis.ANDROID_TTS_PKG_STRING)) {
                         isGoogleTtsAvailable = false;
                     }
