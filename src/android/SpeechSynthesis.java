@@ -36,7 +36,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
     private int state = STOPPED;
     private CallbackContext startupCallbackContext;
     private CallbackContext callbackContext;
-    private boolean isGoogleTtsAvailable = true;
+    private boolean isTtsWorking = true;
 
     private Set<Voice> voiceList = null;
 
@@ -135,10 +135,10 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
                     mTts = new TextToSpeech(cordova.getActivity().getApplicationContext(), this,
                             SpeechSynthesis.ANDROID_TTS_PKG_STRING);
 
-                    if (!Arrays.asList(mTts.getEngines()).contains(SpeechSynthesis.ANDROID_TTS_PKG_STRING)) {
-                        isGoogleTtsAvailable = false;
+                    if (!Arrays.asList(mTts.getEngines()).contains(SpeechSynthesis.ANDROID_TTS_PKG_STRING) && (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.LOLLIPOP_MR1)) {
+                        isTtsWorking = false;
                     }
-                } else if (isGoogleTtsAvailable) {
+                } else if (isTtsWorking) {
             		getVoices(callbackContext);
                 }
                 PluginResult pluginResult = new PluginResult(status, SpeechSynthesis.INITIALIZING);
@@ -169,7 +169,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
         JSONObject voice;
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            if (isGoogleTtsAvailable) {
+            if (isTtsWorking) {
                 this.voiceList = mTts.getVoices();
                 for (Voice v : this.voiceList) {
                     Locale locale = v.getLocale();
@@ -194,7 +194,7 @@ public class SpeechSynthesis extends CordovaPlugin implements OnInitListener, On
             for (int i = 0; i < list.length; i++) {
                 locale = list[i];
                 voice = new JSONObject();
-                if (isGoogleTtsAvailable && mTts.isLanguageAvailable(locale) > 0) {
+                if (isTtsWorking && mTts.isLanguageAvailable(locale) > 0) {
                     try {
                         voice.put("voiceURI", locale.getLanguage()+"-"+locale.getCountry());
                         voice.put("name", locale.getDisplayLanguage(locale) + " " + locale.getDisplayCountry(locale));
